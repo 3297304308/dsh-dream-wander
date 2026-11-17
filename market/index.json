@@ -1,0 +1,94 @@
+{
+  "format": 1,
+  "title": {
+    "en": "dsh-dream-wander",
+    "zh": "走神与做梦"
+  },
+  "description": {
+    "en": "Mind-wandering and dreaming for DeepSeek Harness agents: idle reverie, sleep judging, dream play-out and waking residue.",
+    "zh": "给 DeepSeek Harness 角色加上走神与做梦：独处联想、睡眠判定、梦境演出、醒后残留。"
+  },
+  "metadata": {
+    "categories": {
+      "ai-agent": {
+        "title": {
+          "en": "AI agent",
+          "zh": "AI 角色"
+        }
+      },
+      "fun": {
+        "title": {
+          "en": "Fun",
+          "zh": "趣味"
+        }
+      }
+    },
+    "labels": {
+      "dream": {
+        "title": {
+          "en": "Dream",
+          "zh": "梦"
+        }
+      },
+      "wander": {
+        "title": {
+          "en": "Wandering",
+          "zh": "走神"
+        }
+      },
+      "chinese-first": {
+        "title": {
+          "en": "Chinese-first",
+          "zh": "中文优先"
+        }
+      }
+    }
+  },
+  "plugins": [
+    {
+      "name": "dsh-dream-wander",
+      "title": {
+        "en": "Wander & Dream",
+        "zh": "走神与做梦"
+      },
+      "description": {
+        "en": "Idle reverie and dreams for DSH agents: sleep judging, half-act dream generation, pixelated residue and degraded dream copies.",
+        "zh": "给角色加上走神与做梦：睡眠判定、半幕梦境生成、打码残留与衰减副本。"
+      },
+      "icon": "https://raw.githubusercontent.com/3297304308/dsh-dream-wander/main/icon.svg",
+      "author": "smile",
+      "homepage": "https://github.com/3297304308/dsh-dream-wander#readme",
+      "repository": {
+        "url": "https://github.com/3297304308/dsh-dream-wander"
+      },
+      "metadata": {
+        "category": "ai-agent",
+        "keywords": [
+          "dream",
+          "wander",
+          "deepseek-harness",
+          "dsh-plugin",
+          "agent",
+          "memory"
+        ],
+        "labels": [
+          "dream",
+          "wander",
+          "chinese-first"
+        ]
+      },
+      "versions": [
+        {
+          "version": "0.1.0",
+          "publishTimestamp": 1794906321,
+          "source": {
+            "type": "npm"
+          },
+          "engines": {
+            "dsh": ">=0.2.2-rc.3 <0.3.0-0"
+          }
+        }
+      ]
+    }
+  ]
+}
