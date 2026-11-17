@@ -14,7 +14,7 @@
 > ⚠️ **出厂两个开关全关、作用域为空**——装完不打开就等于没装。
 
 0. **启用 + 刷新**：在 DSH 的 设置 → 插件 里确认「走神与做梦」是启用状态（刚装完/更新后需要刷新一次页面，让面板重新加载）。
-1. **装**：用插件页「添加插件」选本目录，或用 `plugin_manager install_bundle` 指向本目录（本地目录方式，见「安装」）。
+1. **装**：在 DSH 插件页「添加插件」输入包名 `dsh-dream-wander`（npm 安装，推荐）；或按「安装」里的本地目录/源码方式装。
 2. **开**：设置 → **走神与做梦** → 打开「做梦开关」「走神开关」，把「作用域会话」选成你要生效的那个会话——**改完一定要点页面底部的「保存」**（面板是草稿态，不点保存不生效、热应用不会触发）。
 3. **验证（先看走神，再看梦）**：
    - 先跟她说 3-5 句话让她产出词（面板「运行状态→词池」要 >0，词池空时不做梦）；
@@ -34,15 +34,16 @@
 
 ## 安装
 
-**现在可用（本地目录）**：
+**npm 安装（推荐）**：在 DSH 插件页「添加插件」输入包名 `dsh-dream-wander`，或用 `plugin_manager install_bundle` 目标为包名 `dsh-dream-wander`（已发布：https://www.npmjs.com/package/dsh-dream-wander；GitHub 源码仓库：https://github.com/3297304308/dsh-dream-wander）。装好后设置 → 插件 里确认启用，刷新页面，设置页出现「走神与做梦」。
+
+**本地目录安装（源码 / 开发用）**：
 
 1. 把本目录放到任意位置（或保持 link）；
 2. 在 DSH 插件页「添加插件」选本目录，或用 `plugin_manager install_bundle`（目标为本目录绝对路径）；它会把 `dsh-dream-wander` 加进 profile 的依赖与 patch；
 3. 设置 → 插件 里确认已启用；刷新页面后设置页左侧出现「走神与做梦」；
-4. 安装前建议备份 profile 的 `package.json` 与 `cordis.patch.yml`。
+4. 本地 link 安装前建议备份 profile 的 `package.json` 与 `cordis.patch.yml`。
 
-**npm 安装（推荐）**：`plugin_manager install_bundle` 目标为包名 `dsh-dream-wander`（已发布：https://www.npmjs.com/package/dsh-dream-wander；GitHub 源码仓库：https://github.com/3297304308/dsh-dream-wander）。
-**源码开发**：`git clone` 后先在插件目录跑 `pnpm install` 装依赖，再 link 安装；改动热应用。
+**源码开发**：`git clone https://github.com/3297304308/dsh-dream-wander` 后先在插件目录跑 `pnpm install` 装依赖，再 link 安装；改动热应用。
 
 ## 配置
 
@@ -87,13 +88,12 @@
 
 ## 数据与隐私
 
-- **你会看到什么**：走神段落与梦境副本要打开下面「数据在哪」里的文件看（面板「内容查看」折叠区可以直接看正文，见下）；梦的正文**不会出现在聊天/会话**里，她最多记得残留与最后画面；如果一直盯着会话窗口等“梦”，会觉得它没运行。
+- **你会看到什么**：走神段落与梦境副本写在下方「数据在哪」的文件里（设置页「内容查看」折叠区也能直接看正文，见本节「内容查看」）；梦的正文**不会出现在聊天/会话**里，她最多记得残留与最后画面；一直盯着会话窗口等“梦”会觉得它没运行。
 - **额外 LLM 调用与费用**：每次走神 = 1 次生成调用；一场梦 ≈ 1 次场景生成 + 每半幕 1 次生成（默认参数下约 10 次；间隔/幕数/重试都会让实际次数变化）；注入内容变化时有一次整份系统提示重写（长会话下 token 可能明显跳一下，属预期）。都走你配置的 LLM provider、消耗账号额度，本插件无遥测、不上报。
 - **数据在哪**：默认 `<DSH_HOME>/dream-wander-data`（`DSH_HOME` 默认 `~/.dsh`）。想数据跟着插件目录走（整个文件夹拷走/拷回）可设 `dataDir: "./data"`；也支持环境变量 `DREAM_WANDER_DATA`。相对路径按插件目录解析。
 - **数据文件**：`state.json`（状态机、判定进度、替换位图、词频池、会话 id、**她的走神原文与迷糊语**）、`走神/<日期>.md`、`残留/`、`梦境副本/`、`plugin.log`、`apply-status.json`、`instance.lock`。
 - **内容查看（只读）**：设置页「运行状态」下面的「内容查看」折叠区可以直接看：今天的走神逐段、最新残留原文（含打码方块 □）、最近 3 个梦境副本（含 □）、最后画面、正在做的梦（已放出的部分）。接口只接受本机回环来源与本机 Host、同源、GET（POST 405、跨源/非回环来源 403；DSH 若绑到局域网，本接口也不对外）；梦的正文仍只存内存、不落盘。截图前请把「内容查看」合上或打码。
-- **恢复默认后**：插件回到全关、数据目录回到默认（旧数据不会搬到新目录）；想继续看旧数据就把 `dataDir` 指回原路径，或之后写迁移说明。
-- **在哪看效果**：走神看 `<数据目录>/走神/<日期>.md`（每天一个文件、每天首次唤醒清空）；梦的原文看 `<数据目录>/梦境副本/<日期>-<场次>.md`（按可见比例逐日打码降档）；「运行状态」卡只有数字与状态；正文在设置页的「内容查看」里（见下）。
+- **恢复默认后**：插件回到全关、数据目录回到默认（旧数据不会自动搬过去）；想继续用旧数据就把 `dataDir` 指回原路径。
 - **隐私提醒**：梦境正文、残留、词频、日志可能很私密——**不要提交到仓库、不要直接贴进 issue**；截图前把会话标题/路径/QQ 号打码。
 - **分发/发布前检查**：① 删掉 `data/` 与 `instance.lock`（它们含真实会话 id 与旧进程锁，拷给别人会撞锁）；② 确认 `git status` 里没有 data；③ npm 包由 `files` 白名单控制、不含 data。
 - **隐私披露**：本插件不向任何服务器上报数据；但副本/残留/日志就存在本机数据目录里——若角色的会话与本插件同在一个 sandbox 策略下，理论上它能读到自己数据目录中的文件（未做实测，介意可把 `dataDir` 指到它够不到的位置）。
@@ -138,10 +138,10 @@
 
 - **安装**：见上面「安装」；装了 qq-bridge 时在配置里填 `bridge.dir` 与 `bridge.keys`。
 - **卸载（优先插件管理器）**：在 DSH 插件页对 `dsh-dream-wander` 点 Remove（会自动清依赖/lock/链接）；若只能手动：①从 profile 的 `package.json` 删掉 `dependencies['dsh-dream-wander']` 与 `dsh.profile.bundles` 里的同名项，在 profile 目录跑一次 `pnpm install`；②从 profile 的 `cordis.patch.yml` 删掉 `id: dream-wander` 的覆盖段；③删除插件目录；④重启 DSH。数据目录可留可删（删掉=丢失当日词频/残留/副本）。注意：会话历史里已注入的旧系统提示不会被自动清掉，重启后她在会话里跑一回合（或重置会话）才会清。
-- **整体关闭**：两个开关全关后插件完全静默，角色行为与安装前一致；数据目录保留（后台 tick 仍会做残留过期清理与副本降档）。
+- **整体关闭**：两个开关全关后插件**对外完全静默**（不生成、不注入），角色行为与安装前一致；数据目录保留（后台 tick 仍会做残留过期清理与副本降档）。
 
 ## 开发与测试
 
-- 目录：`index.js`（装配/事件/巡检）、`lib/`（schema、config、store、freq、wander、dream、interrupt、signal、copy、memory、clock、client 面板）、`locale/`、`icon.svg`、`cordis.patch.yml`。
+- 目录：`index.js`（装配/事件/巡检）、`lib/`（schema、config、store、freq、wander、dream、interrupt、signal、copy、memory、clock、view、client 面板）、`locale/`、`icon.svg`、`cordis.patch.yml`。
 - 测试：`node --test tests/`（Node 20+，`node:test`；用临时数据目录，不碰真实数据）；受限环境（如 DSH 沙箱，spawn 被拒）改用 `node tests/index.mjs`（单进程）；包清单自检 `node tests/preflight-bundles.mjs`。测试只在源码仓库内可跑（npm 包不含 tests）。
 - 许可：MIT。图标为手绘 SVG，随 MIT 授权。qq-bridge 为可选外部程序，不随本包分发、不修改。
