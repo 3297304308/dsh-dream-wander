@@ -64,7 +64,7 @@ test('latestResidue：旧绝对路径失效时按当前数据目录兜底（P1-3
   fs.mkdirSync(path.join(dir, '残留'), { recursive: true });
   fs.writeFileSync(path.join(dir, '残留', '2026-11-16-1.md'), '词：陷\n', 'utf8');
   s.her().residueAt = Date.now();
-  s.her().residuePath = 'C:\\旧目录\\残留\\2026-11-16-1.md'; // 旧绝对路径（不存在）
+  s.her().residuePath = path.join(os.tmpdir(), 'dw-old-dir', '残留', '2026-11-16-1.md'); // 旧绝对路径（不存在；跨平台）
   assert.equal(s.latestResidue(), '词：陷\n');
 });
 

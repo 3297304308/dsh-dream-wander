@@ -17,7 +17,7 @@ test('readViewData：走神分段、残留、副本数字序', () => {
   fs.writeFileSync(path.join(dir, '走神', '2026-11-17.md'), '第一段。\n\n第二段。\n\n', 'utf8');
   fs.writeFileSync(path.join(dir, '残留', '2026-11-16-1.md'), '词：陷\n', 'utf8');
   for (const n of ['2026-11-16-1.md', '2026-11-16-2.md', '2026-11-16-10.md', '乱名.md']) fs.writeFileSync(path.join(dir, '梦境副本', n), n, 'utf8');
-  const her = mkHer({ residuePath: 'C:\\旧\\残留\\2026-11-16-1.md' });
+  const her = mkHer({ residuePath: path.join(os.tmpdir(), 'dw-old-dir', '残留', '2026-11-16-1.md') });
   const v = readViewData({
     dataDir: dir, day: '2026-11-17', her,
     wanderPath: (d) => path.join(dir, '走神', d + '.md'),
