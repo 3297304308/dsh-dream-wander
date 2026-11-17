@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.1.1
+
+### Changed
+- 第三人称指代中性化：「她」→「角色」；模型提示词改为「你/自己」（不改变行为）；插件/数据仍称「它」
+- README：增加「开发方式」小节（本插件由 DeepSeek Harness 大力支持）、安装节改为 npm 优先、补充内容查看/排障/隐私披露等
+- 新增 `market/index.json`（插件市场索引 format 1）与英文 README
+
+### Fixed
+- CI：测试改用单进程入口 `node tests/index.mjs`、修复跨平台测试路径（Windows/Linux × Node 20/22/24 全绿）
+
 ## 0.1.0
 
 ### Added
