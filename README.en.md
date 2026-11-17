@@ -32,16 +32,16 @@ Mind-wandering and dreaming for DeepSeek Harness (DSH) agents.
 
 ## Install
 
-**Currently available (local directory)**:
+**npm install (recommended)**: in the DSH Plugins page add the package name `dsh-dream-wander`, or `plugin_manager install_bundle` with target `dsh-dream-wander` (published: https://www.npmjs.com/package/dsh-dream-wander; source: https://github.com/3297304308/dsh-dream-wander). Confirm it is enabled in Settings → Plugins, refresh the page, then 「走神与做梦」 appears in Settings.
+
+**Local directory install (source / development)**:
 
 1. Put this directory anywhere (or keep the link);
 2. Add it via the Plugins page, or `plugin_manager install_bundle` with the absolute directory path;
-3. Make sure it is enabled in Settings → Plugins; refresh the page and 「走神与做梦」 appears in Settings;
-4. Back up the profile's `package.json` and `cordis.patch.yml` before installing.
+3. Confirm it is enabled in Settings → Plugins; refresh the page and 「走神与做梦」 appears in Settings;
+4. Back up the profile's `package.json` and `cordis.patch.yml` before a local link install.
 
-**After publication (registry)**: `plugin_manager install_bundle` with the package name `dsh-dream-wander` (not published yet; this repo URL is also to be created).
-
-**Source development**: `git clone`, run `pnpm install`, link-install, then changes hot-apply.
+**Source development**: `git clone https://github.com/3297304308/dsh-dream-wander`, run `pnpm install` in the plugin directory, then link-install; changes hot-apply.
 
 ## Configuration
 
