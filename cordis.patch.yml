@@ -1,0 +1,11 @@
+# 走神与做梦 · 插件自带默认配置（随包发布）
+# 出厂默认：两个开关都关闭、作用域为空——装上后插件静默，使用者到设置页打开并选择会话。
+# 本机/实验用的参数不写在这里（升级会覆盖它），请写到 profile 的 cordis.patch.yml（面板保存会自动生成）。
+# 注意：insert 行的 name 必须是裸包名（与 package.json name 一致），不能写子路径，否则客户端模块扫描找不到 dsh.client。
+- insert:
+    - id: dream-wander
+      name: 'dsh-dream-wander'
+      config:
+        dreamEnabled: false
+        wanderEnabled: false
+        scope: []

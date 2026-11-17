@@ -1,0 +1,72 @@
+{
+  "name": "dsh-dream-wander",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "走神与做梦：给 DeepSeek Harness 角色加上独处联想与做梦（睡眠判定、梦境演出、醒后残留）。Mind-wandering and dreaming for DSH agents.",
+  "keywords": [
+    "deepseek",
+    "deepseek-harness",
+    "dsh",
+    "dsh-plugin",
+    "dream",
+    "wander",
+    "agent",
+    "memory"
+  ],
+  "author": {
+    "name": "smile",
+    "url": "https://github.com/3297304308"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/3297304308/dsh-dream-wander.git"
+  },
+  "homepage": "https://github.com/3297304308/dsh-dream-wander#readme",
+  "bugs": {
+    "url": "https://github.com/3297304308/dsh-dream-wander/issues"
+  },
+  "main": "index.js",
+  "exports": {
+    ".": "./index.js",
+    "./client": "./lib/client.js",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg",
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "index.js",
+    "lib",
+    "cordis.patch.yml",
+    "locale",
+    "icon.svg",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE",
+    "README.en.md"
+  ],
+  "engines": {
+    "dsh": ">=0.2.2-rc.3 <0.3.0-0"
+  },
+  "dependencies": {
+    "@deepseek-ai/schemastery": "^3.19.0"
+  },
+  "scripts": {
+    "test": "node --test tests/",
+    "preflight": "node tests/preflight-bundles.mjs",
+    "pack:check": "npm pack --dry-run",
+    "prepublishOnly": "npm test && npm run preflight",
+    "test:local": "node tests/index.mjs"
+  },
+  "dsh": {
+    "manifestVersion": 1,
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "inject": []
+    }
+  }
+}
