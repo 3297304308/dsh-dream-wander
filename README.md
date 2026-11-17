@@ -41,7 +41,7 @@
 3. 设置 → 插件 里确认已启用；刷新页面后设置页左侧出现「走神与做梦」；
 4. 安装前建议备份 profile 的 `package.json` 与 `cordis.patch.yml`。
 
-**发布后可用（注册表）**：`plugin_manager install_bundle` 目标为包名 `dsh-dream-wander`（本包尚未发布到 npm，现在照做会失败；GitHub 仓库也还没建）。
+**发布后可用（注册表）**：`plugin_manager install_bundle` 目标为包名 `dsh-dream-wander`（本包尚未发布到 npm，现在照做会失败；GitHub 源码仓库：https://github.com/3297304308/dsh-dream-wander）。
 
 **源码开发**：`git clone` 后先在插件目录跑 `pnpm install` 装依赖，再 link 安装；改动热应用。
 
