@@ -162,7 +162,7 @@ const memory = new Memory(store, cfg);
     if (r.action === 'interrupt') {
       interrupt.clearCount(her);
       store.log(`dream: 信号中断（${type}，轮询通道）→ 通知 pre-step 放行`);
-      // 放行窗口：pre-step 正在等一个轮询周期，看到这个标记就放行本回合（她真的醒来）
+      // 放行窗口：pre-step 正在等一个轮询周期，看到这个标记就放行本回合（角色真的醒来）
       her.releaseUntil = Date.now() + 15_000;
       dream.finishBySignal(agentId).catch(() => {});
     } else if (r.action === 'continue') {
@@ -181,7 +181,7 @@ const memory = new Memory(store, cfg);
   };
   dream._onSignal = onDreamSignal;
   dream._scopeSessionId = String(cfg.scope?.[0] ?? ''); // 信号轮询用真实会话 id（映射表键）
-  wander._signal = signal; // 走神生成取她最近对话做上下文（方案二.5）
+  wander._signal = signal; // 走神生成取角色最近对话做上下文（方案二.5）
 
   const inScope = (agent) => {
     if (!cfg.scope || cfg.scope.length === 0) return false; // 空作用域=不生效（设计约定十二节）
@@ -199,7 +199,7 @@ const memory = new Memory(store, cfg);
   // 决策 enter 但提交被取消/外层 reject/崩溃时签名不更新，下一回合会自然重试（审查 P0-2）
   const pendingSig = new Map(); // sid -> sig
 
-  // —— 事件：现实她收到消息（活动+唤醒+做梦期间走敏感度）——
+  // —— 事件：现实角色收到消息（活动+唤醒+做梦期间走敏感度）——
   ctx.on('agent/inbox/inserted', (payload) => {
     try {
       const agent = payload?.agent;
@@ -209,8 +209,8 @@ const memory = new Memory(store, cfg);
       const her = store.her();
       const wasAwake = her.status === 'awake';
       const prevActivity = st.lastActivity ?? 0; // 更新前的上次活动（判"静默后第一次被叫回来"）
-      // 做梦期间的消息是被拦截信号（被吞信号不算她的唤醒）：不刷新活动/独处计时；
-      // 其他状态下的消息=真实外部活动（她醒了/醒着），刷新活动与"有人理她"计时
+      // 做梦期间的消息是被拦截信号（被吞信号不算角色的唤醒）：不刷新活动/独处计时；
+      // 其他状态下的消息=真实外部活动（角色醒了/醒着），刷新活动与"有人理角色"计时
       if (her.status !== 'dreaming') {
         st.lastActivity = Date.now();
         st.lastHuman = Date.now();
@@ -219,7 +219,7 @@ const memory = new Memory(store, cfg);
       const textStr = typeof text === 'string' ? text
         : (Array.isArray(text) ? text.map((b) => b?.text ?? '').join('') : '');
       // 做梦期间：信号计数统一走轮询通道（unread 明细、seq 去重）；inbox 这里只观测不计数。
-      // 吞消息由 agent/pre-step 拦截负责（被吞信号不算她的唤醒，设计约定五节）。
+      // 吞消息由 agent/pre-step 拦截负责（被吞信号不算角色的唤醒，设计约定五节）。
       if (her.status === 'dreaming') {
         store.log(`dream: inbox 收到唤醒输入（${textStr.slice(0, 40)}…），交 pre-step 拦截`);
       } else {
@@ -236,7 +236,7 @@ const memory = new Memory(store, cfg);
     } catch (e) { store.log(`inbox handler ERROR: ${e?.message ?? e}`); }
   });
 
-  // 上一轮 assistant-stream 时她的状态（stream-only 唤醒检测；重载即清，不落盘）
+  // 上一轮 assistant-stream 时角色的状态（stream-only 唤醒检测；重载即清，不落盘）
   let lastStreamHerStatus = '';
 
   // 从桥接唤醒文本提取信号类型（pre-step 同步通道；轮询通道用 classifyMessage）
@@ -254,12 +254,12 @@ const memory = new Memory(store, cfg);
     return m ? Number(m[1]) : 0;
   };
 
-  // —— 拦截通道：dreaming 期间吞掉桥接投递的唤醒输入（设计约定五节/十节：被吞信号不算她的唤醒）——
+  // —— 拦截通道：dreaming 期间吞掉桥接投递的唤醒输入（设计约定五节/十节：被吞信号不算角色的唤醒）——
   // 实测（验证 1，2026-11-15）：reject 后消息被本轮领走、下一回合重进，需要每一步持续拦。
   // 四类分流：①代发触发的"回复检查"唤醒=噪音→吞掉、梦继续、不结算；
-  //          ②桥接按自身时钟拉起（超时/主动机会）=她自然醒→中断并放行；
-  //          ③桥接消息唤醒=被拦信号→同步走敏感度：第 1 次哼唧吞掉，第 2 次断梦**放行**（她真的醒来处理）；
-  //          ④非桥接输入（用户在 GUI 直接发言等）=冲她来的强信号→中断并放行。
+  //          ②桥接按自身时钟拉起（超时/主动机会）=角色自然醒→中断并放行；
+  //          ③桥接消息唤醒=被拦信号→同步走敏感度：第 1 次哼唧吞掉，第 2 次断梦**放行**（角色真的醒来处理）；
+  //          ④非桥接输入（用户在 GUI 直接发言等）=冲角色来的强信号→中断并放行。
   ctx.on('agent/pre-step', async (payload, next) => {
     const agent0 = payload?.agent;
     if (!agent0) return next();
@@ -284,7 +284,7 @@ const memory = new Memory(store, cfg);
       // 成本依据（inject-审查 实测）：一次归一化=整份系统提示重写、未缓存重算 13~17.6 万 token；
       // 只追加实测未缓存仅 8.2k。2026-11-16 作者拍板：拟真松一点可以，兜底必须做好。
       const sid = String(agent0.id);
-      // 签名两组：stale（会过期必须清的段）/ wander（走神，只增不会让她记错）
+      // 签名两组：stale（会过期必须清的段）/ wander（走神，只增不会让角色记错）
       const parts = injectSigParts(sid);
       const prevSig = her0.injectSig?.[sid];
       const prevStale = typeof prevSig === 'string' ? prevSig : String(prevSig?.stale ?? '');
@@ -349,8 +349,8 @@ const memory = new Memory(store, cfg);
       // 桥接投递的唤醒提示（含【唤醒】类标题或"原因："行）；否则视为用户直接输入
       const isBridgeWake = /【(唤醒|回复检查|主动机会|引导唤醒|提醒)】/.test(texts) || /原因：/.test(texts);
       if (!isBridgeWake) {
-        store.log('dream: 非桥接输入（用户直接发言）=冲她来的强信号，中断并放行');
-        // 放行前先等结算完（判断+残留/画面/心情）：否则这一回合的注入还是空的、她连"做过梦"都不知道（审查 H5）
+        store.log('dream: 非桥接输入（用户直接发言）=冲角色来的强信号，中断并放行');
+        // 放行前先等结算完（判断+残留/画面/心情）：否则这一回合的注入还是空的、角色连"做过梦"都不知道（审查 H5）
         await Promise.race([
           dream.finishBySignal(String(cfg.scope?.[0] ?? '')).catch(() => {}),
           new Promise((r) => setTimeout(r, 6000)),
@@ -369,9 +369,9 @@ const memory = new Memory(store, cfg);
         store.log('dream: 桥接内部提示（提醒/引导）=吞掉（非人信号）');
         return { kind: 'reject' };
       }
-      // ③ 桥接按自身时钟拉起（她没被拦住的那一刻真的醒了）
+      // ③ 桥接按自身时钟拉起（角色没被拦住的那一刻真的醒了）
       if (/原因：(你设置的有限潜水时间已到|群里已经安静)/.test(texts)) {
-        store.log('dream: 桥接非消息唤醒=她自然醒，中断梦（随后放行）');
+        store.log('dream: 桥接非消息唤醒=角色自然醒，中断梦（随后放行）');
         await Promise.race([
           dream.finishBySignal(String(cfg.scope?.[0] ?? '')).catch(() => {}),
           new Promise((r) => setTimeout(r, 6000)),
@@ -416,7 +416,7 @@ const memory = new Memory(store, cfg);
       }
       if ((her.releaseUntil ?? 0) > Date.now()) {
         delete her.releaseUntil;
-        store.log('dream: 轮询已判定中断/放行 → 放行本回合（她真的醒来处理）');
+        store.log('dream: 轮询已判定中断/放行 → 放行本回合（角色真的醒来处理）');
         if (her.status === 'dreaming') {
           // 放行前等结算完，保证这一回合的注入（画面/残留/心情）已就绪（审查 H5）
           await Promise.race([
@@ -425,7 +425,7 @@ const memory = new Memory(store, cfg);
           ]);
         }
         store.save();
-        return callNext(); // 自唤醒：放行后她会话处理这批消息
+        return callNext(); // 自唤醒：放行后角色会话处理这批消息
       }
       if (her.status !== 'dreaming') {
         // 等待期间梦已被别的路径结束（自然醒/超时/热重载）→ 梦不存在了，本回合不该再吞
@@ -442,7 +442,7 @@ const memory = new Memory(store, cfg);
     }
   });
 
-  // —— 事件：现实她说出的话（活动+词频）——
+  // —— 事件：现实角色说出的话（活动+词频）——
   let lastFreqSave = 0;
   let lastStreamSave = 0;
   // 入词前的日切：设计约定六节 L98"词频池在当日首次唤醒时清空重置（新一天从空池开始）"。
@@ -488,19 +488,19 @@ const memory = new Memory(store, cfg);
           }
         } catch {}
       }
-      // 梦进行中现实她说话：代发迷糊语后不算自然醒来（现实她仍睡着，设计约定十节被动回应）；否则=现实她自然醒来中断
+      // 梦进行中现实角色说话：代发迷糊语后不算自然醒来（现实角色仍睡着，设计约定十节被动回应）；否则=现实角色自然醒来中断
       if (her.status === 'dreaming') {
         const groggyFresh = her.groggyAt && (Date.now() - her.groggyAt < 180_000);
         if (groggyFresh) {
           // 被动哼唧回合（注入后 3 分钟内的说话都算被动回应），梦继续
           store.log(`dream: 被动回应（迷糊语），梦继续`);
         } else {
-          store.log(`dream: 梦进行中现实她醒来（自然醒来中断）`);
+          store.log(`dream: 梦进行中现实角色醒来（自然醒来中断）`);
           dream.finishBySignal(id).catch(() => {});
         }
       } else if (her.status === 'sleeping') {
-        // 睡眠中她主动开口=她醒了（设计约定五节：梦醒=有梦的睡眠中她实际醒来）
-        store.log(`dream: 睡眠中现实她醒来（开口）`);
+        // 睡眠中角色主动开口=角色醒了（设计约定五节：梦醒=有梦的睡眠中角色实际醒来）
+        store.log(`dream: 睡眠中现实角色醒来（开口）`);
         if (her.hitAt) {
           // 本段命中时刻还没到就醒了：本段作废、**不扣额度**（作者口径：判上了才 K−1）
           delete her.hitAt;
@@ -516,32 +516,32 @@ const memory = new Memory(store, cfg);
         if (her.mood || her.residueAt) her.awakeAt = Date.now();
         store.save();
       }
-      // 只要她现在醒着就记唤醒时刻（上面分支之外还有 dreaming→awake 等路径）
+      // 只要角色现在醒着就记唤醒时刻（上面分支之外还有 dreaming→awake 等路径）
       if (her.status === 'awake' && !her.wokeAt) {
         her.wokeAt = Date.now();
         her.wokeBy = id;
       }
-      // 梦醒时刻（设计约定十一节：心情/残留窗口自现实她真正醒来起算）
+      // 梦醒时刻（设计约定十一节：心情/残留窗口自现实角色真正醒来起算）
       if ((her.mood || her.residueAt) && !her.awakeAt) {
         her.awakeAt = Date.now();
         her.wokeBy = id;
       }
-      // 残留 24h 锚点=她真正醒来那一刻（只在梦醒那次记录；其他唤醒不重置，设计约定）
+      // 残留 24h 锚点=角色真正醒来那一刻（只在梦醒那次记录；其他唤醒不重置，设计约定）
       if (her.residueAt && her.awakeAt && !her.residueWakeAt) her.residueWakeAt = her.awakeAt;
-      // 她开口=这一轮把迷糊语说掉了 → 消费 groggy（并记 groggyAt 供计频排除）
+      // 角色开口=这一轮把迷糊语说掉了 → 消费 groggy（并记 groggyAt 供计频排除）
       if (her.groggy) {
         her.groggyAt = Date.now();
         delete her.groggy;
         delete her.groggySetAt;
       }
-      // 她真的醒着说话：若当前会话还没有走神批次（刚醒/换会话），取一批注入；清醒期间不重复刷
+      // 角色真的醒着说话：若当前会话还没有走神批次（刚醒/换会话），取一批注入；清醒期间不重复刷
       const mem0 = her.wanderMemory;
       // 刚醒（上一 chunk 还是 sleeping/dreaming，现在 awake）也刷：覆盖 stream-only 唤醒（无 inbox 消息）的场景
       const prevStreamStatus = lastStreamHerStatus;
       lastStreamHerStatus = her.status;
       const justWoke = (prevStreamStatus === 'sleeping' || prevStreamStatus === 'dreaming') && her.status === 'awake';
       if (her.status === 'awake' && (justWoke || !mem0 || String(mem0.sid) !== id || mem0.day !== localDay())) refreshWanderMemory(id);
-      // 词频：现实她的思考（reasoning-delta）与说出的话（text-delta）。
+      // 词频：现实角色的思考（reasoning-delta）与说出的话（text-delta）。
       // 双开关全关时不计频（设计约定十二节：出厂全关=插件不生效）；
       // 被动回应（代发迷糊语后 3 分钟内的输出）不计频（设计约定六节）；只计 delta（block-end 会双计）
       const frame = payload?.frame ?? {};
@@ -565,8 +565,8 @@ const memory = new Memory(store, cfg);
   });
 
   // —— 注入变量：注册 section 引用（{{变量名}} 插值渲染进每回合提示词）——
-  // 只注入"现实她"应知的口子：迷糊语/画面/心情/残留；梦全文只进"梦境她"的生成上下文（dream.js）
-  // 归属（设计约定五节）：残留/心情/画面只注入唤醒她的那个会话（wokeBy）
+  // 只注入"现实角色"应知的口子：迷糊语/画面/心情/残留；梦全文只进"梦境角色"的生成上下文（dream.js）
+  // 归属（设计约定五节）：残留/心情/画面只注入唤醒角色的那个会话（wokeBy）
   const currentSessionId = () => {
     try {
       const a = ctx.agents.currentInitiator();
@@ -578,18 +578,18 @@ const memory = new Memory(store, cfg);
     const id = currentSessionId();
     return !!id && (cfg.scope ?? []).some((s) => String(s) === id);
   };
-  // 归属（设计约定五节口径 2）：只注入唤醒她的那个会话；wokeBy 空=她没醒过（或已重置）→ 一律不注入（防串台）
+  // 归属（设计约定五节口径 2）：只注入唤醒角色的那个会话；wokeBy 空=角色没醒过（或已重置）→ 一律不注入（防串台）
   const belongsToWokeBy = (her) => inCurrentScope() && !!her.wokeBy && currentSessionId() === String(her.wokeBy);
   // 注：所有注入变量在 dreaming 期间直接返回空且不消费——DSH 先 assemble 再 pre-step，
   // 做梦期间被拦的回合会丢弃 assembly，若在这里消费（取走迷糊语/推进走神计数）就会被"看不见的回合"吃掉。
   const notDreaming = () => store.her().status !== 'dreaming';
 
-  // 走神注入批次：唤醒时一次性取"未注入的当日走神段"（设计约定四节 L67：只进她下一次唤醒的会话），
+  // 走神注入批次：唤醒时一次性取"未注入的当日走神段"（设计约定四节 L67：只进角色下一次唤醒的会话），
   // 清醒期间保持同一批文本不变。provider 里每 step 切段会让 DSH 的 in-history 路由每步追加
-  // 一整份系统提示（讨论员实测：63 次追加里 47 次是走神引起的），也会让她"想起来又忘掉"。
+  // 一整份系统提示（讨论员实测：63 次追加里 47 次是走神引起的），也会让角色"想起来又忘掉"。
   // 走神累积记忆：唤醒时把"未注入过的当日走神段"追加进 her.wanderMemory（不是替换）。
-  // 为什么累积：归一化会重写整份提示词，走神如果是"替换式批次"，每次归一化都等于让她忘掉上次走神；
-  // 累积渲染保证任何一次归一化后她"今天想起过什么"仍在新的 head 里（审查 P1-6，讨论员第二轮）
+  // 为什么累积：归一化会重写整份提示词，走神如果是"替换式批次"，每次归一化都等于让角色忘掉上次走神；
+  // 累积渲染保证任何一次归一化后角色"今天想起过什么"仍在新的 head 里（审查 P1-6，讨论员第二轮）
   const refreshWanderMemory = (sid) => {
     try {
       const her = store.her();
@@ -637,7 +637,7 @@ const memory = new Memory(store, cfg);
   });
   // 注入签名拆两组（归一化节流）：
   // stale = 会过期、必须立即清的段（画面/心情/残留/做过梦/迷糊语）；这些一变就归一化
-  // wander = 只增不会让她记错的段（走神）；变化只追加，累积到阈值/日切再统一清（旧版本是今天的子集）
+  // wander = 只增不会让角色记错的段（走神）；变化只追加，累积到阈值/日切再统一清（旧版本是今天的子集）
   const injectSigParts = (sid) => {
     const m = renderedSlots.get(String(sid)) ?? {};
     const stale = ['dream_groggy', 'dream_frame', 'dream_mood', 'dream_know', 'dream_residue']
@@ -655,10 +655,10 @@ const memory = new Memory(store, cfg);
       if (!notDreaming()) return '';
       if (!cfg.dreamEnabled) return ''; // 做梦关=完全静默（设计约定）
       if (!her.groggy) return '';
-      // 时效：信号后 3 分钟仍无回合则作废（不隔夜哼唧）；归属：只进唤醒她的会话
+      // 时效：信号后 3 分钟仍无回合则作废（不隔夜哼唧）；归属：只进唤醒角色的会话
       if (Date.now() - (her.groggySetAt ?? 0) > 180_000) return '';
       if (!her.wokeBy || currentSessionId() !== String(her.wokeBy)) return '';
-      // 只读不消费：消费放在她真的说话之后（assistant-stream）——provider 里取走会让同一回合的
+      // 只读不消费：消费放在角色真的说话之后（assistant-stream）——provider 里取走会让同一回合的
       // 多个 step 反复改渲染文本，DSH 的 in-history 路由就会每步追加一整份系统提示（审查 B1）
       return `（你半梦半醒，只含糊哼唧一声，别展开回应）${her.groggy}`;
     } catch { return ''; }
@@ -671,10 +671,10 @@ const memory = new Memory(store, cfg);
       if (!notDreaming()) return '';
       if (!cfg.dreamEnabled) return ''; // 做梦关=完全静默（设计约定）
       if (!belongsToWokeBy(her)) return '';
-      if (!(her.wokeAt ?? her.awakeAt)) return ''; // 她没醒不注入画面（醒来才有"脑中留着的画面"；用 wokeAt 以免中性梦漏掉）
+      if (!(her.wokeAt ?? her.awakeAt)) return ''; // 角色没醒不注入画面（醒来才有"脑中留着的画面"；用 wokeAt 以免中性梦漏掉）
       const t = dream.frameTextFor(her);
       if (!t) return '';
-      // 中断梦要让她知道"梦是被打断的"（设计约定十节 L164）；自然梦画面 2 小时内是清楚的
+      // 中断梦要让角色知道"梦是被打断的"（设计约定十节 L164）；自然梦画面 2 小时内是清楚的
       const kind = her.frame?.kind === 'interrupt' ? 'interrupt' : 'natural';
       if (kind === 'interrupt') {
         return `（你自己知道的梦境画面，不必主动提起：你醒的时候梦没做完就断了，脑子里只剩断掉前最后那一眼——${t}。画面正在变模糊。）`;
@@ -683,7 +683,7 @@ const memory = new Memory(store, cfg);
     } catch { return ''; }
   });
 
-  // —— 注入：梦后心情（2 小时窗口自她真正醒来起算）——
+  // —— 注入：梦后心情（2 小时窗口自角色真正醒来起算）——
   regVar('dream_mood', (context) => {
     try {
       const her = store.her();
@@ -696,8 +696,8 @@ const memory = new Memory(store, cfg);
     } catch { return ''; }
   });
 
-  // —— 注入：走神内容（设计约定四节 L67：走神进入会话上下文、她记得；只进她下一次唤醒的会话）——
-  // 渲染"今天她想起过的走神"累积列表（her.wanderMemory）：归一化重写提示词时记忆仍在 head 里，
+  // —— 注入：走神内容（设计约定四节 L67：走神进入会话上下文、角色记得；只进角色下一次唤醒的会话）——
+  // 渲染"今天角色想起过的走神"累积列表（her.wanderMemory）：归一化重写提示词时记忆仍在 head 里，
   // 不会因为"批次被替换"而忘掉上次的联想（审查 P1-6，讨论员第二轮）
   regVar('dream_wander', (context) => {
     try {
@@ -728,7 +728,7 @@ const residueFilePathFor = (her) => {
 const residueTextFor = (her) => {
     try {
       if (!her.residueAt || !her.residuePath) return null;
-      // 24 小时锚点=她真正醒来那一刻（residueWakeAt；每场新梦结算时清空重记，设计约定）
+      // 24 小时锚点=角色真正醒来那一刻（residueWakeAt；每场新梦结算时清空重记，设计约定）
       const anchor = her.residueWakeAt ?? her.awakeAt;
       if (!anchor || Date.now() - anchor > (cfg.residue?.hours ?? 24) * 3600_000) return null;
       const fp = residueFilePathFor(her);
@@ -740,7 +740,7 @@ const residueTextFor = (her) => {
       const parts = [];
       if (words) parts.push(`几个模糊的词：${words}`);
       if (sentence) {
-        // 方块是给使用者看的马赛克；注入给她时换成"只记得零碎几个字"的自然描述
+        // 方块是给使用者看的马赛克；注入给角色时换成"只记得零碎几个字"的自然描述
         const broken = sentence.replace(/□+/g, '…').replace(/^…+|…+$/g, '').replace(/…{2,}/g, '…');
         if (broken.replace(/…/g, '').trim()) parts.push(`记得最深的一句话（只剩零碎的几个字）：${broken}`);
         else if (words) parts.push('最深的那句话已经完全糊了，记不起内容');
@@ -753,7 +753,7 @@ const residueTextFor = (her) => {
   // 梦醒记忆形态（二选一）：words=词句残留 / blur=打码梦文本（设计约定十一节 2026-11-16 新增）
   const residueForm = () => (cfg.residue?.form === 'blur' ? 'blur' : 'words');
 
-  // 打码梦文本（形态二）：读当前记忆文件；方块=她记不清的位置 → 注入成省略号+自然描述。
+  // 打码梦文本（形态二）：读当前记忆文件；方块=角色记不清的位置 → 注入成省略号+自然描述。
   // 注：可见字数按比例×总字数四舍五入取整，差一两个字属正常浮动（字数只有整数）
   const residueBlurTextFor = (her) => {
     try {
@@ -771,7 +771,7 @@ const residueTextFor = (her) => {
   // 当前形态下"实际可注入的残留"（dream_know 据此判断是否已有别的注入承载）
   const residueInjectable = (her) => (residueForm() === 'blur' ? !!residueBlurTextFor(her) : !!residueTextFor(her));
 
-  // —— 注入：梦醒残留（她手里最近一场梦的那份，24 小时；自然措辞）——
+  // —— 注入：梦醒残留（角色手里最近一场梦的那份，24 小时；自然措辞）——
   regVar('dream_residue', (context) => {
     try {
       const her = store.her();
@@ -846,12 +846,12 @@ const residueTextFor = (her) => {
       if (day !== (store.state.lastRolloverDay ?? '')) {
         const her = store.her();
         const inSleep = her.status === 'dreaming' || her.status === 'sleeping';
-        // 清池时机=她"当日首次醒来"（设计约定六节 L98），不是 0 点：她今天还没醒过时先不清，
+        // 清池时机=角色"当日首次醒来"（设计约定六节 L98），不是 0 点：角色今天还没醒过时先不清，
       // 否则跨 0 点那段夜睡会"池空不判"（2026-11-16 复测：22:30/23:30 最后活动仍踩中）
       const dayStartMs = new Date(`${day}T00:00:00`).getTime();
       const herNow = store.her();
       // 醒过的判定用独立 wokeDay（awakeAt 只在有梦的唤醒里写，只开走神/无梦日会永远不日切——终审 P1）；
-      // 再加"今天有过活动"：断电/重启时她本来就醒着（bootRecover 不跑、wokeDay 还是昨天），
+      // 再加"今天有过活动"：断电/重启时角色本来就醒着（bootRecover 不跑、wokeDay 还是昨天），
       // 不认这条会导致日切整天不跑、旧走神文档/走神记忆跨日残留（2026-11-17 开机实测）
       let todayActive = false;
       try {
@@ -912,12 +912,12 @@ const residueTextFor = (her) => {
       store.pruneExpiredResidue(cfg.residue?.hours ?? 24);
       if (!cfg.scope || cfg.scope.length === 0) return;
       const now = Date.now();
-      // 直接对 scope 内每个会话 id 建条目（现实她睡着时本就不活）
+      // 直接对 scope 内每个会话 id 建条目（现实角色睡着时本就不活）
       for (const sid of cfg.scope) {
         const id = String(sid);
         store.agent(id);
       }
-      // 她最近一次活动=各会话活动的最晚者（任一会话有活动即她活跃；全体静默满 confirmH 才判入睡）
+      // 角色最近一次活动=各会话活动的最晚者（任一会话有活动即角色活跃；全体静默满 confirmH 才判入睡）
       let globalLast = 0;
       let humanLast = 0;
       for (const st of Object.values(store.state.agents ?? {})) {
@@ -927,14 +927,14 @@ const residueTextFor = (her) => {
       const aloneMs = globalLast ? now - globalLast : 0;
       const humanAloneMs = humanLast ? now - humanLast : now;
       const her = store.her();
-      // 做梦判定：按现实她全局独处（设计约定五节：唯一入睡窗口）；用真实会话 id（审查 B14：不再落假 id 'her'）
-      // 注意：dream.tick 里的"入睡/醒来状态机"与开关解耦（只关做梦时也要识别她睡着，走神"入睡即停"依赖它）
+      // 做梦判定：按现实角色全局独处（设计约定五节：唯一入睡窗口）；用真实会话 id（审查 B14：不再落假 id 'her'）
+      // 注意：dream.tick 里的"入睡/醒来状态机"与开关解耦（只关做梦时也要识别角色睡着，走神"入睡即停"依赖它）
       dream.tick(String(cfg.scope?.[0] ?? 'her'), aloneMs);
-      // 走神双源之一：DSH 自动休眠发生（她完成收尾进入潜水：桥接 confirmedAt 变化，设计约定四节 L60）
+      // 走神双源之一：DSH 自动休眠发生（角色完成收尾进入潜水：桥接 confirmedAt 变化，设计约定四节 L60）
       if (cfg.wanderEnabled && her.status === 'awake') {
         const dive = signal.readDiveState(cfg.scope[0]);
         const prevConfirmed = store.state.lastDiveConfirmedAt;
-        // 只有"她设了唤醒条件完成收尾"（set_wake_config）才算进入潜水；
+        // 只有"角色设了唤醒条件完成收尾"（set_wake_config）才算进入潜水；
         // mark_read 也会写 confirmedAt，那是"看完了划走"不是入睡，不能拿来掷走神（审查 M2/H9）
         const isSleepConfirm = dive.confirmedBy === 'set_wake_config'
           || (!dive.confirmedBy && dive.mode === 'diving'); // 旧版桥接没 confirmedBy 时退回 mode 判断
@@ -951,7 +951,7 @@ const residueTextFor = (her) => {
           store.state.lastDiveConfirmedAt = dive.confirmedAt; // 记水位但不掷骰（避免下次变化时误判）
         }
       }
-      // 走神双源之二：全局"无人理她"（设计约定四节：外部消息计时；她自己的输出不重置）
+      // 走神双源之二：全局"无人理角色"（设计约定四节：外部消息计时；角色自己的输出不重置）
       if (cfg.wanderEnabled && her.status === 'awake') {
         const w = cfg.wander;
         const allowed = wanderTimeOk(w, now); // 默认 8-20 窗口内；untilSleep 开启则 8:00 起到入睡前（凌晨 0-8 不算）
@@ -968,7 +968,7 @@ const residueTextFor = (her) => {
 
   // 巡检器启动前：恢复中断的梦（重启后 dreaming 按中断收尾）
   dream.bootRecover();
-  // 重启/关机时长不算"她独处"：把各会话最后活动时间夹到本次启动时刻，避免开机瞬间就满足 confirmH
+  // 重启/关机时长不算"角色独处"：把各会话最后活动时间夹到本次启动时刻，避免开机瞬间就满足 confirmH
   // 或命中时刻已过期却立刻开演（审查 M7）
   {
     const bootTs = Date.now();
