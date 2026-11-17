@@ -140,6 +140,10 @@
 - **卸载（优先插件管理器）**：在 DSH 插件页对 `dsh-dream-wander` 点 Remove（会自动清依赖/lock/链接）；若只能手动：①从 profile 的 `package.json` 删掉 `dependencies['dsh-dream-wander']` 与 `dsh.profile.bundles` 里的同名项，在 profile 目录跑一次 `pnpm install`；②从 profile 的 `cordis.patch.yml` 删掉 `id: dream-wander` 的覆盖段；③删除插件目录；④重启 DSH。数据目录可留可删（删掉=丢失当日词频/残留/副本）。注意：会话历史里已注入的旧系统提示不会被自动清掉，重启后她在会话里跑一回合（或重置会话）才会清。
 - **整体关闭**：两个开关全关后插件**对外完全静默**（不生成、不注入），角色行为与安装前一致；数据目录保留（后台 tick 仍会做残留过期清理与副本降档）。
 
+## 开发方式
+
+本插件由 **DeepSeek Harness（DSH）大力支持**：设计讨论、代码实现、审查与测试主要在 DSH 内完成；作者本人仅负责提出方案和许愿。如果你也在用 DSH，可以直接让它读这个仓库的源码、提 issue 参与改进。
+
 ## 开发与测试
 
 - 目录：`index.js`（装配/事件/巡检）、`lib/`（schema、config、store、freq、wander、dream、interrupt、signal、copy、memory、clock、view、client 面板）、`locale/`、`icon.svg`、`cordis.patch.yml`。

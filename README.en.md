@@ -132,6 +132,10 @@ Signal channel (optional, qq-bridge):
 - **Uninstall (prefer the plugin manager)**: remove `dsh-dream-wander` from the Plugins page; manually: ① remove `dependencies['dsh-dream-wander']` and the entry from `dsh.profile.bundles` in the profile's `package.json`, run `pnpm install` in the profile; ② remove the `id: dream-wander` override from the profile's `cordis.patch.yml`; ③ delete the plugin directory; ④ restart DSH. The data directory can be kept or deleted.
 - **Turn off**: with both switches off the plugin is externally silent; background ticks still prune expired residue and degrade copies.
 
+## How it was made
+
+This plugin is **powered by DeepSeek Harness (DSH)**: design discussion, implementation, review and testing were largely done inside DSH; the author only proposed ideas and made wishes. If you also use DSH, you can point it at this repository and let it read the source or file issues.
+
 ## Development & tests
 
 - Layout: `index.js` (wiring/events/ticker), `lib/` (schema, config, store, freq, wander, dream, interrupt, signal, copy, memory, clock, client panel), `locale/`, `icon.svg`, `cordis.patch.yml`.
