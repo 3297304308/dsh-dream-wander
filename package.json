@@ -1,6 +1,6 @@
 {
   "name": "dsh-dream-wander",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "type": "module",
   "description": "走神与做梦：给 DeepSeek Harness 角色加上独处联想与做梦（睡眠判定、梦境演出、醒后残留）。Mind-wandering and dreaming for DSH agents.",
   "keywords": [
@@ -56,7 +56,7 @@
     "test": "node --test tests/",
     "preflight": "node tests/preflight-bundles.mjs",
     "pack:check": "npm pack --dry-run",
-    "prepublishOnly": "npm test && npm run preflight",
+    "prepublishOnly": "node tests/index.mjs && node tests/preflight-bundles.mjs",
     "test:local": "node tests/index.mjs"
   },
   "dsh": {
