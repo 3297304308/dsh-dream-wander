@@ -129,14 +129,14 @@ test('系统腔产物：重试后放弃', async () => {
   assert.ok(store.logs.some((l) => l.includes('系统腔')));
 });
 
-test('词频回流：有 reasoning → reasoning+产物；无 reasoning → 产物双计', async () => {
+test('词频回流（v24 减法）：产物单计一次、插件推理不计', async () => {
   const dir = mkTmp();
   const store = mkStore(dir);
   const w = new Wander(mkCtx(['有点走神。'], { reasoning: '想到了午饭' }), store, mkCfg({ p: 1 }));
   const freq = mkFreq();
   w._addFreq = freq.add;
   await w.maybeWander('a', '独处');
-  assert.deepEqual(freq.calls, ['想到了午饭', '有点走神。']);
+  assert.deepEqual(freq.calls, ['有点走神。']);
 
   const dir2 = mkTmp();
   const store2 = mkStore(dir2);
@@ -144,7 +144,7 @@ test('词频回流：有 reasoning → reasoning+产物；无 reasoning → 产�
   const freq2 = mkFreq();
   w2._addFreq = freq2.add;
   await w2.maybeWander('b', '独处');
-  assert.deepEqual(freq2.calls, ['又走神了。', '又走神了。']);
+  assert.deepEqual(freq2.calls, ['又走神了。']);
 });
 
 test('残留带入：prompt 含残影、方块转省略号', async () => {

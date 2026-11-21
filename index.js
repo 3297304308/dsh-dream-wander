@@ -6,12 +6,13 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { DEFAULTS, mergeConfig, roundProbs, clampCounts } from './lib/config.js';
 import { Store, localDay } from './lib/store.js';
-import { Freq } from './lib/freq.js';
-import { Wander } from './lib/wander.js';
+import { Freq, FREQ_VERSION } from './lib/freq.js';
+import { Wander, WANDER_SYSTEM_TEMPLATE } from './lib/wander.js';
 import { Dream } from './lib/dream.js';
 import { Interrupt } from './lib/interrupt.js';
 import { Copy, retentionDays } from './lib/copy.js';
 import { readViewData } from './lib/view.js';
+import { Material } from './lib/material.js';
 import { Memory } from './lib/memory.js';
 import { Signal } from './lib/signal.js';
 import { wanderTimeOk } from './lib/clock.js';
@@ -119,17 +120,47 @@ export function apply(ctx, rawConfig) {
   }
 
   // 词频恢复（当日池）
-  const freq = Freq.fromJSON(store.freq(), cfg);
+  let freq = Freq.fromJSON(store.freq(), cfg);
+  if ((store.state.freqVer ?? 0) !== FREQ_VERSION) {
+    store.log(`词频规则升级 v${store.state.freqVer ?? 0} → ${FREQ_VERSION}：清空旧池`);
+    freq = new Freq(cfg);
+    store.state.freq = {};
+    store.state.freqDay = localDay();
+    store.state.freqVer = FREQ_VERSION;
+    store.save();
+  }
+  // 动态提示词词表静态兜底（插件自身 system 模板）
+  try { freq.setPromptWords([WANDER_SYSTEM_TEMPLATE]); } catch {}
+    // 动态提示词词表（2026-11-21）：每次组装系统提示词时收集其文本，只用于会话推理路径的词频过滤
+    try {
+      ctx.on('system-prompt/assemble', (assembly, context, next) => {
+        try {
+          let text = '';
+          const walk = (v, depth) => {
+            if (depth > 6 || v === null || v === undefined) return;
+            if (typeof v === 'string') { text += v + '\n'; return; }
+            if (Array.isArray(v)) { for (const x of v) walk(x, depth + 1); return; }
+            if (typeof v === 'object') { for (const k of Object.keys(v)) walk(v[k], depth + 1); }
+          };
+          walk(assembly, 0);
+          if (text.trim()) freq.setPromptWords([text.slice(0, 20000)]);
+        } catch {}
+        return next();
+      });
+    } catch {}
   // 启动时池子属于旧日 → 清空（设计约定"新一天从空池开始"；fromJSON 已顺手过滤停用词/英文碎片）
   if (store.freqDay() && store.freqDay() !== localDay()) {
     const oldDay = store.freqDay();
     freq.pool.clear();
+    freq.care.clear();
     store.state.freq = {};
     store.state.freqDay = localDay();
     store.log(`启动时词频池跨日清空（旧日 ${oldDay} → ${localDay()}）`);
     store.save();
   }
   const wander = new Wander(ctx, store, cfg);
+  const material = new Material(ctx, store, cfg); // 每日素材卡（最近 X 天的印象，只进走神生成）
+  wander._material = material;
   const dream = new Dream(ctx, store, cfg);
   const interrupt = new Interrupt(store, cfg);
   const copy = new Copy(store, cfg);
@@ -224,6 +255,7 @@ const memory = new Memory(store, cfg);
         store.log(`dream: inbox 收到唤醒输入（${textStr.slice(0, 40)}…），交 pre-step 拦截`);
       } else {
         dream.onMessage(id);
+        material.push('对方', textStr); // 素材卡：被吞进梦里的信号不算她看到的，不进素材
       }
       // 走神注入（作者拍板 A：只在唤醒时刻）——睡着→醒，或静默满 aloneMin 后第一次被叫回来
       const silentLong = prevActivity > 0 && Date.now() - prevActivity >= (cfg.wander?.aloneMin ?? 15) * 60_000;
@@ -249,10 +281,6 @@ const memory = new Memory(store, cfg);
   // 从唤醒文本提取触发消息 seq —— 注意：桥接实际唤醒文本是裸 reason（private/atMention/poke…），
   // 运行时并不带 @seq（源码 evaluateWakeTriggerV2 返回值 + 实测会话日志 @seq 0 次），所以不再拿它去重；
   // 去重统一用轮询通道的真实消息 seq（her.lastSignalSeq）。此函数保留给旧桥接版本兼容。
-  const wakeTextSeq = (texts) => {
-    const m = texts.match(/@seq(\d+)/);
-    return m ? Number(m[1]) : 0;
-  };
 
   // —— 拦截通道：dreaming 期间吞掉桥接投递的唤醒输入（设计约定五节/十节：被吞信号不算角色的唤醒）——
   // 实测（验证 1，2026-11-15）：reject 后消息被本轮领走、下一回合重进，需要每一步持续拦。
@@ -448,24 +476,28 @@ const memory = new Memory(store, cfg);
   // 入词前的日切：设计约定六节 L98"词频池在当日首次唤醒时清空重置（新一天从空池开始）"。
   // 不能在 tick 里靠 freqDay 判——入词会先把 freqDay 写成今日，tick 就以为"池=今日词"而保留昨日池
   // （历史旧词进当日池，违反【废】L93；审查 A4/B3）。改为入词时判断：池所属日不是今天就先清池。
-  const addFreq = (text) => {
+  const addFreq = (text, opts = {}) => {
     const today = localDay();
     if (store.freqDay() !== today) {
       freq.pool.clear();
+    freq.care.clear();
       store.state.freqDay = today;
       store.log(`词频池跨日重置（新一天从空池开始，今日 ${today}）`);
     }
-    freq.add(text);
+    freq.add(text, opts);
   };
-  const freqSaveSoon = () => {
-    const now = Date.now();
-    if (now - lastFreqSave < 10_000) return; // 10 秒节流
-    lastFreqSave = now;
+  const freqSave = (force = false) => {
+    if (!force) {
+      const now = Date.now();
+      if (now - lastFreqSave < 10_000) return; // 10 秒节流
+      lastFreqSave = now;
+    }
     store.state.freq = freq.toJSON();
     store.state.freqDay = localDay();
     store.save();
   };
   wander._addFreq = addFreq;
+  wander._freqFlush = () => freqSave(true); // 走神产物写盘后强制落盘（防热重载丢词）
   dream._addFreq = addFreq;
   ctx.on('agent/assistant-stream', (payload) => {
     try {
@@ -548,12 +580,38 @@ const memory = new Memory(store, cfg);
       let text = '';
       const groggyFresh = her.groggyAt && (Date.now() - her.groggyAt < 180_000);
       const enabled = cfg.dreamEnabled || cfg.wanderEnabled;
-      if (enabled && !groggyFresh && frame.type === 'chunk' && (frame.chunk?.type === 'text-delta' || frame.chunk?.type === 'reasoning-delta')) {
+      const isTextDelta = frame.type === 'chunk' && frame.chunk?.type === 'text-delta';
+      const isReasonDelta = frame.type === 'chunk' && frame.chunk?.type === 'reasoning-delta';
+      // 发言工具检测（speechMode）：她在用发送工具说话时，正文文本只是动作/内心
+      if (frame.type === 'chunk' && frame.chunk?.type === 'block-end' && frame.chunk?.block?.type === 'tool-call') {
+        const tname = String(frame.chunk.block?.name ?? '');
+        const tools = Array.isArray(cfg.freq?.speechTools) ? cfg.freq.speechTools : ['send_message', 'reply'];
+        if (tools.some((t) => tname === t || tname.endsWith('__' + t) || tname.endsWith(t))) {
+          st._speechMode = true;
+          if ((cfg.freq?.countAssistantText ?? 'auto') !== 'on') st._textBuf = ''; // 工具调用前的正文也不计（终审 M P2-1）
+        }
+      }
+      if (enabled && !groggyFresh && frame.type === 'chunk' && (isTextDelta || isReasonDelta)) {
         text = frame.chunk.text ?? '';
       }
+      // 词频：整轮聚合；正文与推理分两个 buffer（推理路径过动态提示词词表）
       if (typeof text === 'string' && text) {
-        addFreq(text);
-        freqSaveSoon();
+        const textCounting = cfg.freq?.countAssistantText ?? 'auto';
+        if (isTextDelta && (textCounting === 'on' || (textCounting === 'auto' && !st._speechMode))) {
+          material.push('我', text);
+          st._textBuf = (st._textBuf ?? '') + text;
+          if ([...st._textBuf].length > 4000) st._textBuf = st._textBuf.slice(-4000);
+        }
+        if (isReasonDelta && cfg.freq?.countReasoning !== 'none') {
+          st._reasonBuf = (st._reasonBuf ?? '') + text;
+          if ([...st._reasonBuf].length > 4000) st._reasonBuf = st._reasonBuf.slice(-4000);
+        }
+      }
+      if (frame.type === 'end') {
+      st._speechMode = false; // 回合内标记：本回合结束后复位（不落盘粘滞）
+        if (st._textBuf) { addFreq(st._textBuf); st._textBuf = ''; }
+        if (st._reasonBuf) { addFreq(st._reasonBuf, { reasoning: true }); st._reasonBuf = ''; }
+        freqSave();
       }
       // 落盘节流（1.5 秒）：一次回复有几百个 chunk，逐 chunk 全量 save 会写放大（审查 E5）
       const now = Date.now();
@@ -564,6 +622,30 @@ const memory = new Memory(store, cfg);
     } catch (e) { store.log(`stream handler ERROR: ${e?.message ?? e}`); }
   });
 
+  // 说出口的话：发言工具执行成功后取 arguments.messages（词频+素材同源，母本 v24）
+  ctx.on('tools/result', (exec, result) => {
+    try {
+      const agent = exec?.agent;
+      if (!agent || !inScope(agent)) return;
+      if (result?.isError) return;
+      const name = String(exec?.name ?? '');
+      const tools = Array.isArray(cfg.freq?.speechTools) ? cfg.freq.speechTools : ['send_message', 'reply'];
+      if (!tools.some((t) => name === t || name.endsWith('__' + t) || name.endsWith(t))) return;
+      const args = exec?.arguments;
+      let obj = args;
+      if (typeof args === 'string') { try { obj = JSON.parse(args); } catch { return; } }
+      const list = Array.isArray(obj?.messages) ? obj.messages : (obj?.message !== undefined ? [obj.message] : (obj?.text !== undefined ? [obj.text] : []));
+      if (!list.length) return;
+      store.log(`freq: 发言工具命中 ${name}（${list.length} 条）`);
+      for (const m of list) {
+        const t = typeof m === 'string' ? m : String(m?.text ?? '');
+        if (!t.trim()) continue;
+        addFreq(t);
+        material.push('我', t);
+      }
+    } catch (e) { store.log(`tools/result handler ERROR: ${e?.message ?? e}`); }
+  });
+  
   // —— 注入变量：注册 section 引用（{{变量名}} 插值渲染进每回合提示词）——
   // 只注入"现实角色"应知的口子：迷糊语/画面/心情/残留；梦全文只进"梦境角色"的生成上下文（dream.js）
   // 归属（设计约定五节）：残留/心情/画面只注入唤醒角色的那个会话（wokeBy）
@@ -764,7 +846,7 @@ const residueTextFor = (her) => {
       if (!raw) return null;
       const broken = raw.replace(/□+/g, '…').replace(/^…+|…+$/g, '').replace(/…{2,}/g, '…');
       if (!broken.replace(/…/g, '').trim()) return null;
-      return `（你自己知道的梦醒记忆，不必主动提起：你醒来后还隐约记得那场梦的片段，但很多地方已经像被方块糊住了，能看清的只有这些零碎的字——${broken}。被问起时可以如实说这些，其余记不清了。）`;
+      return `（你自己知道的梦醒记忆，不必主动提起：你醒来后还隐约记得那场梦的片段，但很多地方已经糊成一片、记不清了，能看清的只有这些零碎的字——${broken}。被问起时可以如实说这些，其余记不清了。）`;
     } catch { return null; }
   };
 
@@ -875,6 +957,7 @@ const residueTextFor = (her) => {
               store.state.freq = {};
               store.state.freqDay = day;
               freq.pool.clear();
+    freq.care.clear();
             } else {
               store.state.freqDay = day;
             }
@@ -885,6 +968,7 @@ const residueTextFor = (her) => {
             delete her.drawn; delete her.k; delete her.day; // 旧字段兼容清理
             delete her.usedSeq; // 场次序号按当日重排（审查 A12）
             delete her.wanderInjectedCount; // 走神文档清了、注入计数同步清
+            delete her.wanderAngles; // 角度轮转也是当日口径，一起清
             delete her.wanderMemory; // 走神累积记忆一起清（当日口径，设计约定）
             delete her.injectSig; // 日切后重新算签名
             pendingSig.clear(); // 未提交的签名一起清（防跨日把旧签名提交回去）
@@ -896,6 +980,11 @@ const residueTextFor = (her) => {
           store.state.lastRolloverDay = day;
           store.save();
         }
+      }
+      // 每日素材卡：每天第一次 tick（醒着）时生成一次；无素材/失败不阻塞（不落原文、只落清洗后的印象）
+      if (store.her()?.status === 'awake' && (store.state.material?.day !== day || store.state.material?.status !== 'ok')) {
+        const sid = Array.isArray(cfg.scope) ? cfg.scope[0] : '';
+        if (sid) material.ensure(String(sid)).catch((e) => store.log(`material ERROR: ${e?.message ?? e}`));
       }
       // 副本降档：按自然日驱动，tick 里每天至少跑一次（不能只挂在"收到消息"上——
       // 整夜没人发消息时旧副本会一直保持高可见度；degradeAll 幂等，收消息路径的补算照旧保留）
@@ -985,6 +1074,18 @@ const residueTextFor = (her) => {
       her0.status = 'awake';
       her0.wokeDay = localDay();
       store.log('启动：重启算醒来（上一段睡眠的命中判定作废、不扣额度；状态回到醒着）');
+    }
+    // 热重载/重启时若上一场梦已有记忆锚点，补写唤醒锚点（终审 M P1-2）
+    const herBoot = store.her();
+    if (herBoot.residueAt || herBoot.mood || herBoot.dreamAt) {
+      const tBoot = Date.now();
+      herBoot.wokeAt = tBoot;
+      herBoot.wokeBy = String(cfg.scope?.[0] ?? '');
+      if (herBoot.residueAt) {
+        herBoot.awakeAt = tBoot;
+        if (!herBoot.residueWakeAt) herBoot.residueWakeAt = tBoot;
+      }
+      store.saveHer();
     }
     store.save();
   }
@@ -1182,6 +1283,7 @@ const residueTextFor = (her) => {
                   try {
                     const h = store.her();
                     return {
+                    material: (() => { const m = store.state.material; return m ? { day: m.day, status: m.status, reason: m.reason ?? '', len: [...(m.text ?? '')].length } : null; })(),
                       applyAt: store.state.bootedAt ?? null,
                       uptimeMs: Date.now() - (store.state.bootedAt ?? Date.now()),
                       pid: process.pid,
@@ -1192,6 +1294,7 @@ const residueTextFor = (her) => {
                       usedCount: h.usedCount ?? null,
                       allocDay: h.allocDay ?? null,
                       freqPool: freq.pool?.size ?? null,
+    freqCare: (() => { try { return freq.stats(); } catch { return null; } })(),
                       wanderToday: (() => { try { const p = store.wanderPath(localDay()); return fs.existsSync(p) ? fs.readFileSync(p, 'utf8').split('\n\n').map((s) => s.trim()).filter(Boolean).length : 0 } catch { return 0 } })(),
                       todayCopies: (() => { try { return fs.readdirSync(path.join(store.dir, '梦境副本')).filter((f) => f.startsWith(localDay())).length } catch { return 0 } })(),
                       signal: signal.health(),
@@ -1321,6 +1424,7 @@ const residueTextFor = (her) => {
     if (panelRetryTimer) { clearTimeout(panelRetryTimer); panelRetryTimer = null; }
     try { dream.dispose(); } catch {}
     try { wander.dispose(); } catch {}
+    try { material.dispose(); } catch {}
     for (const t of dream.timers.values()) clearInterval(t);
     dream.timers.clear();
     try { signal.stop(); } catch {}

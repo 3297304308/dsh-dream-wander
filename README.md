@@ -1,5 +1,7 @@
 # 走神与做梦（dsh-dream-wander）
 
+[English version](README.en.md)
+
 给 DeepSeek Harness（DSH）角色加上「走神」与「做梦」的 host 插件。
 
 > **English**: Mind-wandering and dreaming for DeepSeek Harness agents: idle reverie, sleep judging, dream play-out, and waking residue. Data lives under `<DSH_HOME>/dream-wander-data` by default; set `dataDir: "./data"` to keep data inside the plugin directory. See the configuration table below.
@@ -34,7 +36,7 @@
 
 ## 安装
 
-**npm 安装（推荐）**：在 DSH 插件页「添加插件」输入包名 `dsh-dream-wander`，或用 `plugin_manager install_bundle` 目标为包名 `dsh-dream-wander`（已发布：https://www.npmjs.com/package/dsh-dream-wander；GitHub 源码仓库：https://github.com/3297304308/dsh-dream-wander）。装好后设置 → 插件 里确认启用，刷新页面，设置页出现「走神与做梦」。
+**npm 安装（推荐）**：在 DSH 插件页「添加插件」输入包名 `dsh-dream-wander`，或用 `plugin_manager install_bundle` 目标为包名 `dsh-dream-wander`（已发布：<https://www.npmjs.com/package/dsh-dream-wander>；GitHub 源码仓库：<https://github.com/3297304308/dsh-dream-wander>）。装好后设置 → 插件 里确认启用，刷新页面，设置页出现「走神与做梦」。
 
 **本地目录安装（源码 / 开发用）**：
 
@@ -58,6 +60,18 @@
 | `wander.untilSleep` | `true` | 放宽至入睡前（起点不变、终点放宽到入睡；跨零点窗口下无额外放宽，仍按起点到次日终点前） |
 | `wander.aloneMin` | `15` | 独处触发时长（分钟） |
 | `wander.p` / `factor` / `threshold` / `max` | `0.3` / `2` / `10` / `50` | 触发概率 / 过度在意因子 / 阈值 / 单条上限 |
+| `wander.angleP` | `0.8` | 联想入口注入概率（0-1；每次从 20 个角度里挑一个引导方向。0=不干涉） |
+| `wander.reasoningEffort` | `low` | 走神生成推理档（low 省 token、少复述指令词） |
+| `wander.material.enabled` | `true` | 每日素材卡（每天首次醒来把最近几天的事压成一段印象给走神当背景；只进生成，不进会话） |
+| `wander.material.days` | `3` | 素材回溯天数（1-14） |
+| `freq.speechTools` | `['send_message','reply']` | 发言工具白名单（工具名后缀匹配；其 `messages` 计为"说出口的话"） |
+| `freq.countAssistantText` | `auto` | 正文文本计频：auto=检测到发言工具时不计 / on=总计 / off=不计 |
+| `freq.countReasoning` | `session` | 会话推理是否计入词频（插件自己生成的推理永远不计） |
+| `freq.promptExclude` | `true` | 动态剔除提示词回显（只作用会话推理路径） |
+| `wander.overCareSensitivity` | `mid` | 过度在意灵敏度：低(0.06/2.0，不易触发) / 中(0.04/1.5) / 高(0.02/1.2，易触发) / 自定义 |
+| `wander.overCareShare` | `0.04` | 过度在意占比阈值（在意池最高频词占比） |
+| `wander.overCareLead` | `1.5` | 过度在意领先倍数（最高频词 ≥ 该倍数×第二名） |
+| `wander.material.form` | `digest` | 素材形式：`digest`=压缩成印象（每天 1 次摘要调用）/ `raw`=保留最近消息片段（不压缩，数字与时间词模糊化，0 次调用） |
 | `wander.dupThreshold` | `0.95` | 走神复读阈值（0.1-1；与今天已写走神的相似度 ≥ 此值算重复，会重试或放弃；越高越宽松） |
 | `cycle.residueP` | `0.3` | 走神带入残留的概率 |
 | `judge.confirmH` | `1` | 入睡确认（静默满 N 小时才算睡着；可配 0-5，0-1 每 0.1、1-3 每 0.5、3-5 每 1） |
@@ -86,17 +100,25 @@
 
 已废弃字段（保留解析、不参与计算、面板不显示，下个版本删除）：`judge.kMin`、`judge.intervalMin`、`play.releaseMinutes`、`interrupt.count`、`actJump.chainP`、`copy.keepDays`、`mood.scale`。
 
+## 词频口径
+
+词频只统计 2 字及以上词语；来源是她自己（说出口的话、动作/内心正文、会话回合推理的中文部分）与走神产物（单计）；插件自己生成时消耗的推理（走神生成、素材卡摘要）不计入——那是插件脚手架、不是她的思考。走神产物不进"在意池"（过度在意判定只看她本人说过/想过的词）。"说出口的话"优先从发言工具的消息里提取（`freq.speechTools`），检测到发言工具后正文动作文本不再计入。规则升级（`freqVer`）时会清空一次旧词池。
+
+## 取词审查
+
+取词时对每个词做合格性检查：虚词、乱码、碎片剔除；另内置一张「取词屏蔽表」只挡低信息量叙事词（如 觉得/心里/出去/整天…，不开放配置）。它只影响入梦取词与过度在意候选，不影响词频统计与在意池分母。
+
 ## 数据与隐私
 
 - **你会看到什么**：走神段落与梦境副本写在下方「数据在哪」的文件里（设置页「内容查看」折叠区也能直接看正文，见本节「内容查看」）；梦的正文**不会出现在聊天/会话**里，角色最多记得残留与最后画面；一直盯着会话窗口等“梦”会觉得它没运行。
-- **额外 LLM 调用与费用**：每次走神 = 1 次生成调用；一场梦 ≈ 1 次场景生成 + 每半幕 1 次生成（默认参数下约 10 次；间隔/幕数/重试都会让实际次数变化）；注入内容变化时有一次整份系统提示重写（长会话下 token 可能明显跳一下，属预期）。都走你配置的 LLM provider、消耗账号额度，本插件无遥测、不上报。
+- **额外 LLM 调用与费用**：每次走神 = 1 次生成调用；素材卡（digest 模式）每天首次醒来 +1 次摘要调用（raw 模式不调用）；一场梦 ≈ 6-8 次生成（上限约 12 次）+ 结束前 1 次好坏判断；素材卡 digest 失败当天最多重试 3 次。都走你配置的 LLM provider、消耗账号额度，本插件无遥测、不上报。
 - **数据在哪**：默认 `<DSH_HOME>/dream-wander-data`（`DSH_HOME` 默认 `~/.dsh`）。想数据跟着插件目录走（整个文件夹拷走/拷回）可设 `dataDir: "./data"`；也支持环境变量 `DREAM_WANDER_DATA`。相对路径按插件目录解析。
-- **数据文件**：`state.json`（状态机、判定进度、替换位图、词频池、会话 id、**角色的走神原文与迷糊语**）、`走神/<日期>.md`、`残留/`、`梦境副本/`、`plugin.log`、`apply-status.json`、`instance.lock`。
+- **数据文件**：`state.json`（状态机、判定进度、替换位图、词频池、会话 id、**角色的走神原文与迷糊语**、素材卡摘要 `material`（digest 模式））、`走神/<日期>.md`、`残留/`、`梦境副本/`、`plugin.log`、`apply-status.json`、`instance.lock`。
 - **内容查看（只读）**：设置页「运行状态」下面的「内容查看」折叠区可以直接看：今天的走神逐段、最新残留原文（含打码方块 □）、最近 3 个梦境副本（含 □）、最后画面、正在做的梦（已放出的部分）。接口只接受本机回环来源与本机 Host、同源、GET（POST 405、跨源/非回环来源 403；DSH 若绑到局域网，本接口也不对外）；梦的正文仍只存内存、不落盘。截图前请把「内容查看」合上或打码。
 - **恢复默认后**：插件回到全关、数据目录回到默认（旧数据不会自动搬过去）；想继续用旧数据就把 `dataDir` 指回原路径。
 - **隐私提醒**：梦境正文、残留、词频、日志可能很私密——**不要提交到仓库、不要直接贴进 issue**；截图前把会话标题/路径/QQ 号打码。
 - **分发/发布前检查**：① 删掉 `data/` 与 `instance.lock`（它们含真实会话 id 与旧进程锁，拷给别人会撞锁）；② 确认 `git status` 里没有 data；③ npm 包由 `files` 白名单控制、不含 data。
-- **隐私披露**：本插件不向任何服务器上报数据；但副本/残留/日志就存在本机数据目录里——若角色的会话与本插件同在一个 sandbox 策略下，理论上角色能读到自己数据目录中的文件（未做实测，介意可把 `dataDir` 指到角色够不到的位置）。
+- **隐私披露**：本插件不向任何服务器上报数据；素材卡的消息原文只留在内存（不落盘），digest 模式只把清洗后的模糊印象（去日期/数字/引号）存进 `state.json` 的 `material`，可随时关掉（`wander.material.enabled=false`）；但副本/残留/日志就存在本机数据目录里——若角色的会话与本插件同在一个 sandbox 策略下，理论上角色能读到自己数据目录中的文件（未做实测，介意可把 `dataDir` 指到角色够不到的位置）。
 - **出站请求**：只有 ①DSH 的 LLM provider（走神/梦生成/判定，消耗账号额度）②可选的**本机** qq-bridge（`127.0.0.1:<port>`，读 state、轮询未读、代发）。**无遥测、不上报任何服务器**。
 - **删除/迁移**：停用插件后直接删/移动数据目录即可；升级前建议备份。
 
@@ -126,7 +148,7 @@
 
 ## 已知限制
 
-- **只在 DSH 0.2.2-rc.3 验证**（`engines.dsh` 会拦截不兼容版本，但不保证行为兼容）；DSH 升级后需复核
+- **按 DSH 0.2.2-rc.3 契约实现；rc.3/rc.5 实测**（`engines.dsh` 会拦截不兼容版本，但不保证行为兼容）；DSH 升级后需复核
 - 设置面板 UI 目前为中文（`locale/` 只有标题/描述的英文）
 - 多会话场景只按作用域首个会话做信号轮询
 - 同一台机器多个 profile 同时启用会争用默认数据目录的 `instance.lock`（第二个实例启动失败、面板提示占用）——给每个 profile 配不同 `dataDir`
@@ -142,7 +164,7 @@
 
 ## 开发方式
 
-本插件由 **DeepSeek Harness（DSH）大力支持**：设计讨论、代码实现、审查与测试主要在 DSH 内完成；我本人仅负责提出方案和许愿。如果你也在用 DSH，可以直接让它读这个仓库的源码、提 issue 参与改进。后续我还会继续更新，因为我又想到了新的点子！欢迎大家对我们提出各种意见和建议。
+本插件由 **DeepSeek Harness（DSH）大力支持**：设计讨论、代码实现、审查与测试主要在 DSH 内完成；作者本人仅负责提出方案和许愿。如果你也在用 DSH，可以直接让它读这个仓库的源码、提 issue 参与改进。
 
 ## 开发与测试
 

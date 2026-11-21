@@ -1,6 +1,6 @@
 {
   "name": "dsh-dream-wander",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "type": "module",
   "description": "走神与做梦：给 DeepSeek Harness 角色加上独处联想与做梦（睡眠判定、梦境演出、醒后残留）。Mind-wandering and dreaming for DSH agents.",
   "keywords": [
@@ -47,7 +47,8 @@
     "README.en.md"
   ],
   "engines": {
-    "dsh": ">=0.2.2-rc.3 <0.3.0-0"
+    "dsh": ">=0.2.2-rc.3 <0.3.0-0",
+    "node": ">=20"
   },
   "dependencies": {
     "@deepseek-ai/schemastery": "^3.19.0"
